@@ -65,6 +65,7 @@ void dec(char c){
       //if (idx==5){
       //    data = (inci[0]*10000)+(inci[1]*1000)+(inci[2]*100)+(inci[3]*10)+inci[4];
       break;
+      
       }
       
 }

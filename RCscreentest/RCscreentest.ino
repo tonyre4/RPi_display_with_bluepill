@@ -1,14 +1,23 @@
-
-#define TEST_FONTS    // Comment out to disable custom fonts
-
 #include "SPI.h"
-#include "Waveshare_ILI9486_GFX.h"
+#include "Adafruit_ILI9486_STM32.h"
 
+//RED =       0xF800 --> 1111 1000 0000 0000
+//GREEN =     0x07E0 --> 0000 0111 1110 0000
+//BLUE BLUE = 0x001F --> 0000 0000 0001 1111
 
 
 // Waveshare shield has fixed pin mapping (defined by DEV_config.h)
-Waveshare_ILI9486_GFX tft = Waveshare_ILI9486_GFX();
+Adafruit_ILI9486_STM32 tft;
 
+#define Serial Serial1
+
+void setup() {
+  tft.begin();
+  Serial.begin(500000);
+  Serial.print("Hi!");
+}
+
+const unsigned int h = 320, w = 480;
 int x = 0 , y = 0;
 //char inc[5];
 int idx = 0;
@@ -17,20 +26,7 @@ uint16_t data=0;
 uint16_t inci[5];
 uint16_t times[] = {1,10,100,1000,10000};
 
-void setup(){
-  tft.begin();
-  Serial.begin(115200);
-  Serial.print("Hi!");
-  //tft.fillScreen(ILI9486_BLACK);
-}
-
-//colores = 5bits de r
-//          6bits de g
-//          5bits de b
-
-const unsigned int h = 320, w = 480;
-
-void loop(){
+void loop() {
   if(Serial.available()>0){
     incom = Serial.read();
     dec(incom);

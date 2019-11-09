@@ -3,7 +3,7 @@ import time
 t = 0.00001
 
 if True:
-    ser = serial.Serial('/dev/ttyUSB0',115200)
+    ser = serial.Serial('/dev/ttyUSB0',500000)
    
     
     with open("dec.txt", "r") as f:

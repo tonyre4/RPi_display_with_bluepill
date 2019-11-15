@@ -3,9 +3,10 @@ import numpy as np
 import cv2
 
 height,width = 320, 480
-ou = ""
+fcntr = 0
 
 for im in glob("./imgs/*"):
+    ou = ""
     img = cv2.imread(im)
     
     
@@ -67,8 +68,10 @@ for im in glob("./imgs/*"):
         ou+= "\n"
         #f.write("\n")
 
-with open("dec.txt", "w+") as f:
-    f.write(ou)
+    with open("./decimgs/ima{}.txt".format(fcntr), "w+") as f:
+        f.write(ou)
+        #f.write("%")
+    fcntr +=1
 
 
 

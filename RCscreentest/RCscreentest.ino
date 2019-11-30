@@ -1,16 +1,54 @@
 #include "SPI.h"
-#include "Adafruit_ILI9486_STM32.h"
 #include <SD.h>
 
+#define  BLACK   0x0000
+#define BLUE    0x001F
+#define RED     0xF800
+#define GREEN   0x07E0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW  0xFFE0
+#define WHITE   0xFFFF
+
+//#define UNOMODE
+
+#define STMMODE
+
+#ifdef STMOLD
+#include "Adafruit_ILI9486_STM32.h"
 //RED =       0xF800 --> 1111 1000 0000 0000
 //GREEN =     0x07E0 --> 0000 0111 1110 0000
 //BLUE BLUE = 0x001F --> 0000 0000 0001 1111
-
-
 // Waveshare shield has fixed pin mapping (defined by DEV_config.h)
 Adafruit_ILI9486_STM32 tft;
-
 #define Serial Serial1
+#define SS_SD PB13
+#endif
+
+#ifdef STMMODE 
+#define LCD_CS PB11 // Chip Select goes to Analog 3
+#define LCD_CD PB1 // Command/Data goes to Analog 2
+#define LCD_WR PB0 // LCD Write goes to Analog 1
+#define LCD_RD PB10 // LCD Read goes to Analog 0
+#define LCD_RESET PC15 // Can alternately just connect to Arduino's reset pin
+#include "Adafruit_GFX.h"// Hardware-specific library
+#include <MCUFRIEND_kbv.h>
+MCUFRIEND_kbv tft;
+#define SS_SD PB13
+#endif
+
+#ifdef UNOMODE
+#define LCD_CS A3 // Chip Select goes to Analog 3
+#define LCD_CD A2 // Command/Data goes to Analog 2
+#define LCD_WR A1 // LCD Write goes to Analog 1
+#define LCD_RD A0 // LCD Read goes to Analog 0
+#define LCD_RESET A4 // Can alternately just connect to Arduino's reset pin
+#include "Adafruit_GFX.h"// Hardware-specific library
+#include <MCUFRIEND_kbv.h>
+MCUFRIEND_kbv tft;
+#define SS_SD 10
+#endif
+
 
 File myFile;
 const unsigned int h = 320, w = 480;
@@ -27,13 +65,30 @@ char prefix[] = ".txt";
 String zzz = "ima0.txt";
 uint8_t fcntr = 0;
 
+#define TESTGFX
+
+
+
+#ifdef MAIN
+
 void setup() {
-  Serial.begin(500000);
+  Serial.begin(38400);
   SDinit();
+
+  #ifndef UNOMODE
   tft.begin();
-  pinMode(PC13, OUTPUT);
-  digitalWrite(PC13,1);
+  #else
+  uint16_t ID = tft.readID(); //
+  Serial.print("ID = 0x");
+  Serial.println(ID, HEX);
+  if (ID == 0xD3D3) ID = 0x9481; // write-only shield
+//    ID = 0x9329;                             // force ID
+  tft.begin(ID);
+  #endif
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN,1);
 }
+
 
 void loop() {
   //if(Serial.available()>0){
@@ -76,7 +131,7 @@ void dec(char c){
 
 void SDinit(){
   Serial.print("Initializing SD card...");
-  if (!SD.begin(PB13)) {
+  if (!SD.begin(SPI_FULL_SPEED,SS_SD)) {
     Serial.println("initialization failed!");
     while (1);
   }
@@ -112,4 +167,21 @@ char readSDchar(){
   }
 }
 
+#endif
+
+#ifdef TESTGFX
+void setup() {
+  tft.begin(0x9486);
+}
+
+
+void loop() {
+    for(x=0;x<100;x++){
+      for (y=0;y<100;y++){
+        tft.drawPixel(y,x,BLUE);
+      }
+    }
+}
+
+#endif
 

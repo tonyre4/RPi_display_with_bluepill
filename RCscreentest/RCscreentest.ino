@@ -1,7 +1,8 @@
 #include "SPI.h"
 #include <SD.h>
 
-#define  BLACK   0x0000
+
+#define BLACK   0x0000
 #define BLUE    0x001F
 #define RED     0xF800
 #define GREEN   0x07E0
@@ -13,6 +14,9 @@
 //#define UNOMODE
 
 #define STMMODE
+#define BLUEDISP
+
+#define TEXTGFX
 
 #ifdef STMOLD
 #include "Adafruit_ILI9486_STM32.h"
@@ -21,20 +25,33 @@
 //BLUE BLUE = 0x001F --> 0000 0000 0001 1111
 // Waveshare shield has fixed pin mapping (defined by DEV_config.h)
 Adafruit_ILI9486_STM32 tft;
-#define Serial Serial1
-#define SS_SD PB13
+//#define Serial Serial1
+#define SS_SD PB12
 #endif
 
 #ifdef STMMODE 
-#define LCD_CS PB11 // Chip Select goes to Analog 3
-#define LCD_CD PB1 // Command/Data goes to Analog 2
-#define LCD_WR PB0 // LCD Write goes to Analog 1
-#define LCD_RD PB10 // LCD Read goes to Analog 0
-#define LCD_RESET PC15 // Can alternately just connect to Arduino's reset pin
+//#define LCD_CS PB8 
+//#define LCD_CD PB7 
+//#define LCD_WR PB6 
+//#define LCD_RD PB0 
+//#define LCD_RESET PB9
+//
+//#define LCD_D0 PA0
+//#define LCD_D1 PA1
+//#define LCD_D2 PA2
+//#define LCD_D3 PA3
+//#define LCD_D4 PA4
+//#define LCD_D5 PA5
+//#define LCD_D6 PA6
+//#define LCD_D7 PA7
+
 #include "Adafruit_GFX.h"// Hardware-specific library
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
-#define SS_SD PB13
+
+#define SS_SD PB12
+#define Serial Serial1
+
 #endif
 
 #ifdef UNOMODE
@@ -65,28 +82,24 @@ char prefix[] = ".txt";
 String zzz = "ima0.txt";
 uint8_t fcntr = 0;
 
-#define TESTGFX
+//#define TESTGFX
 
 
 
 #ifdef MAIN
 
 void setup() {
+  
+  #ifdef RPIDISP
+  tft.begin();
+  #elif BLUEDISP
+  tft.begin(0x9486);
+  #endif
+  //pinMode(PC13, OUTPUT);
+  //digitalWrite(PC13,1);
+  
   Serial.begin(38400);
   SDinit();
-
-  #ifndef UNOMODE
-  tft.begin();
-  #else
-  uint16_t ID = tft.readID(); //
-  Serial.print("ID = 0x");
-  Serial.println(ID, HEX);
-  if (ID == 0xD3D3) ID = 0x9481; // write-only shield
-//    ID = 0x9329;                             // force ID
-  tft.begin(ID);
-  #endif
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN,1);
 }
 
 
@@ -170,10 +183,10 @@ char readSDchar(){
 #endif
 
 #ifdef TESTGFX
+#warning Testing Graphics
 void setup() {
   tft.begin(0x9486);
 }
-
 
 void loop() {
     for(x=0;x<100;x++){
@@ -185,3 +198,43 @@ void loop() {
 
 #endif
 
+#ifdef TESTSD
+void setup() {
+  // Open Serial communications and wait for port to open:
+  SPI.setModule(2);
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for Serial port to connect. Needed for native USB port only
+  }
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(PB12)) {
+    Serial.println("initialization failed!");
+    while (1);
+  }
+  Serial.println("initialization done.");
+
+  myFile = SD.open("ima0.txt");
+  if (myFile) {
+    Serial.println("ima0.txt:");
+
+    // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+      delay(1000);
+    }
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening ima.txt");
+  }
+
+  Serial.println("done!");
+}
+
+void loop() {
+  // nothing happens after setup finishes.
+}
+#endif

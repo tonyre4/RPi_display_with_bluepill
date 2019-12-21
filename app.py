@@ -30,13 +30,22 @@ def serial_ports():
         raise EnvironmentError('Unsupported platform')
 
     result = []
+
+    ps = ['USB','ACM','COM']
+
     for port in ports:
-        try:
-            s = serial.Serial(port)
-            s.close()
-            result.append(port)
-        except (OSError, serial.SerialException):
-            pass
+        for p in ps:
+            if p in port:
+                result.append(port)
+                break
+
+    #for port in ports:
+    #    try:
+    #        s = serial.Serial(port)
+    #        s.close()
+    #        result.append(port)
+    #    except (OSError, serial.SerialException):
+    #        pass
     return result
 
 class app:
@@ -197,6 +206,7 @@ class app:
 
     def updports(self):
         prts = serial_ports()
+        print(prts)
         self.ports.delete(0,END)
         
         for p in prts:

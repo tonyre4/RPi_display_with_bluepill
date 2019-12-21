@@ -54,7 +54,8 @@ bool exitt=false;
 void setup() {
   
 
-  Serial.begin(115200);
+  //Serial.begin(115200);
+  Serial.begin(500000);
   
   SPI.setModule(2);
   tft.begin(0x9486);
@@ -76,9 +77,9 @@ void loop() {
 
 void PCtransf(){
   tftmgs("Entering to \nprogramming mode");
-  delay(10000);
+  delay(5000);
   Serial.write('r');
-  tftmgs("ready");
+  tftmgs("Ready");
   
   while(1){
     if (Serial.available()>0){
@@ -158,6 +159,7 @@ bool dec2(char c){
         tft.setTextSize(2);
         tft.println("Uploading done!");
       exitt = true;
+      delay(2000);
       return true;
   }
   return false;
@@ -211,7 +213,7 @@ void dec(char c){
       y++;
       break;
     case 'z':
-      delay(2000);
+      delay(5000);
       break;
     case '0' ... '?':
       uint16_t cc = c;
@@ -252,8 +254,11 @@ char readSDchar(){
   }
   else{
     myFile.close();
-    readtxtinit();
-    return 'z';
+    while( !readtxtinit() ){
+      ;
+    }
+    //return 'z';
+    return myFile.read();
   }
 }
 

@@ -43,7 +43,10 @@ class app:
     
     def __init__(self):
         #constants
-        self.imgs = [] 
+        self.imgs = []
+        self.sats = []
+        self.brs = []
+
         self.imgcnt = 0
         self.window = Tk()
         self.window.title("AdCharger uploader")
@@ -52,10 +55,13 @@ class app:
         self.grTk = self.cv2totk(self.gr)
         self.drawWidgets()
 
+        self.indImg = -1
+        self.indPort = -1
+
         ##transmission vars
         self.t = 0.00001
         self.dev = ''
-        self.baud = 115200
+        self.baud = 500000
         self.height,self.width = 320, 480
 
         #init app
@@ -72,6 +78,12 @@ class app:
 
     def cvtimg(self,path):
         self.img = cv2.imread(path)
+        b,g,r = cv2.split(self.img)
+        b = np.bitwise_and(b,0xF8)
+        g = np.bitwise_and(g,0xFC)
+        r = np.bitwise_and(r,0xF8)
+        self.img = cv2.merge([b,g,r])
+
         h,w,_ = self.img.shape
         print(h,w)
         if h<w:
@@ -81,16 +93,15 @@ class app:
 
     def roti(self):
         try:
-            index = int(self.listbox.curselection()[0])
-            self.imgs[index] = np.rot90(self.imgs[index],k=2)
-            self.loadimgp(index)
+            self.imgs[self.indImg] = np.rot90(self.imgs[self.indImg],k=2)
+            self.loadimgp(self.indImg)
         except:
             pass
 
     def selectport(self,evt):
         w = evt.widget
-        index = int(w.curselection()[0])
-        value = w.get(index)
+        self.indPort = int(w.curselection()[0])
+        value = w.get(self.indPort)
         self.dev = value
         self.status.set("Status: Puerto %s seleccionado" % value)
         print(self.dev)
@@ -99,34 +110,95 @@ class app:
         file = filedialog.askopenfilename()
         self.status.set("Status: Archivo %s cargado" % file)
         self.imgs.append(self.cvtimg(file))
-        self.img = self.cv2totk(self.imgs[-1])  
-        self.canvas.create_image(20, 20, anchor=NW, image=self.img) 
+        self.brs.append(0)
+        self.sats.append(0)
         self.listbox.insert(END,file)
+        self.indImg = len(self.imgs)-1
+        ##self.listbox.focus(self.indImg)
+        self.loadimgp()
 
-    def loadimgp(self,index):
-        self.img = self.cv2totk(self.imgs[index])  
+    def loadimgp(self,index=-1):
+        if index<0:
+            index = self.indImg
+
+        im = self.imgs[index].copy()
+        hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+        h,s,v = cv2.split(hsv)
+        
+        #Saturating
+        s = s.astype(np.int32)
+        s += self.sats[index]
+        np.clip(s,0,255,s)
+        s = s.astype(np.uint8)
+
+        #brightness
+   #     v = v.astype(np.int32)
+   #     v += self.brs[index]
+   #     np.clip(v,0,255,v)
+   #     v = v.astype(np.uint8)
+        
+        hsv = cv2.merge([h,s,v])
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        b,g,r = cv2.split(img)
+        b = b.astype(np.int32)
+        g = g.astype(np.int32)
+        r = r.astype(np.int32)
+
+        b += self.brs[index]
+        g += self.brs[index]
+        r += self.brs[index]
+
+        np.clip(b,0,255,b)
+        np.clip(g,0,255,g)
+        np.clip(r,0,255,r)
+
+        b = b.astype(np.uint8)
+        g = g.astype(np.uint8)
+        r = r.astype(np.uint8)
+
+        img = cv2.merge([b,g,r])
+
+
+        self.img = self.cv2totk(img)  
         self.canvas.create_image(20, 20, anchor=NW, image=self.img) 
 
     def upload(self):
         self.trans()
 
     def deli(self):
-        index = int(self.listbox.curselection()[0])
-        self.listbox.delete(index)
-        self.imgs.pop(index)
-        self.setgrayimg()
+        self.listbox.delete(self.indImg)
+        self.imgs.pop(self.indImg)
+        self.sats.pop(self.indImg)
+        self.brs.pop(self.indImg)
+        
+        if len(self.imgs==0):
+            self.indImg=-1
+            self.setgrayimg()
+        else:
+            self.indImg=0
+            self.loadimgp(0)
 
     def onselect(self,evt):
         w = evt.widget
-        index = int(w.curselection()[0])
-        value = w.get(index)
-        self.loadimgp(index)
+        self.indImg = int(w.curselection()[0])
+        value = w.get(self.indImg)
+        self.loadimgp(self.indImg)
         #print ('You selected item %d: "%s"' % (index, value))
+
+    def updbright(self,evt):
+        self.brs[self.indImg] = self.br.get()
+        self.loadimgp(self.indImg)
+        
+    def updsat(self,evt):
+        self.sats[self.indImg] = self.sat.get()
+        self.loadimgp(self.indImg)
+
 
     def updports(self):
         prts = serial_ports()
-        #print(prts)
-        #print("no hay ni mergas")
+        self.ports.delete(0,END)
+        
         for p in prts:
             self.ports.insert(END,p)
         
@@ -174,14 +246,25 @@ class app:
         btn4 = Button(self.window, text="Actualizar puertos", command=self.updports)
         btn4.grid(column=2,row=6)
 
+
+        
+
+        self.br = Scale(self.window, from_=-255, to=255,label="Brillo",command=self.updbright)
+        self.br.set(0)
+        self.sat = Scale(self.window, from_=-255, to=255,label="Saturacion",command=self.updsat)
+        self.sat.set(0)
+
+        self.br.grid(column=3,rowspan=2,row=0,sticky=N+S)
+        self.sat.grid(column=3,rowspan=2,row=2,sticky=N+S)
+
         self.status = StringVar(value="Status: Bienvenido!")
 
         statusbar = Label(self.window, textvariable=self.status, bd=1, relief=SUNKEN, anchor=W)
-        statusbar.grid(column=0,columnspan=4,row=7, sticky=W+E)
+        statusbar.grid(column=0,columnspan=4,row=9, sticky=W+E)
 
 
         self.bar = Progressbar(self.window, length=200)
-        self.bar.grid(column=0,columnspan=4,row=8,sticky=W+E)
+        self.bar.grid(column=0,columnspan=4,row=10,sticky=W+E)
         
         self.updports()
 
@@ -210,7 +293,48 @@ class app:
         for i,im in enumerate(self.imgs):
             self.status.set("Subiendo imagen %d de %d" % (i+1,len(self.imgs)))
             ou = ""
-            img = im
+           
+            sval  = self.sats[i]
+            vval  = self.brs[i]
+
+            hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+            h,s,v = cv2.split(hsv)
+
+            #Saturating 
+            s = s.astype(np.int)
+            s += sval
+            np.clip(s,0,255,s)
+            s = s.astype(np.uint8)
+            
+            ##reducing brightness
+            #v = v.astype(np.int)
+            #v += vval
+            #np.clip(v,0,255,v)
+            #v = v.astype(np.uint8)
+
+            hsv = cv2.merge([h,s,v])
+
+            img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            
+            b,g,r = cv2.split(img)
+            b = b.astype(np.int32)
+            g = g.astype(np.int32)
+            r = r.astype(np.int32)
+    
+            b += self.brs[i]
+            g += self.brs[i]
+            r += self.brs[i]
+    
+            np.clip(b,0,255,b)
+            np.clip(g,0,255,g)
+            np.clip(r,0,255,r)
+    
+            b = b.astype(np.uint8)
+            g = g.astype(np.uint8)
+            r = r.astype(np.uint8)
+    
+            img = cv2.merge([b,g,r])
+
             
             #img2 = cv2.resize(img,(self.width,self.height))
             img2 = np.rot90(img,k=1)

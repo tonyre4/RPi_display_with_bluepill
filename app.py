@@ -205,6 +205,8 @@ class app:
         if len(prts)==1:
             self.setDev(prts[0])
             self.status.set("Puerto %s seleccionado" % prts[0])
+            self.setBaud()
+            self.connect()
 
     def drawWidgets(self):
         ###################
@@ -277,16 +279,24 @@ class app:
     def connect(self):
         self.ser = serial.Serial(self.dev,self.baud)
         self.status.set("Conectando con dispositivo...")
+        if not self.ser.isOpen():
+            self.ser.open()
+            print('com3 is open', self.ser.isOpen())
+        self.ser.write('&&&&&&&&&&&&&'.encode())
 
     def setDev(self,st):
+        #if st.find("COM")>-1:
+            #st = st.replace("COM","")
+            #st = int(st)
         self.dev=st
 
-    def setBaud(self,b):
+    def setBaud(self,b=500000):
         self.baud = b
 
     def trans(self):
         self.status.set("Iniciando transferencia")
-        self.connect()
+        if not self.ser.isOpen():
+            self.connect()
         self.fcntr = 0
         self.ser.write('d'.format().encode())
         self.status.set("Borrando imagenes almacenadas")

@@ -1,4 +1,5 @@
 from tkinter.ttk import Progressbar
+import imutils
 import serial
 import time
 from tkinter import *
@@ -10,6 +11,7 @@ import numpy as np
 import sys
 import glob
 
+        
 
 def serial_ports():
     """ Lists serial port names
@@ -46,18 +48,109 @@ def serial_ports():
     
     return result
 
+############################################
+class IMG:
+    def __init__(s,path):
+        s.path = path
+        s.imread()
+
+    def imread(s):
+        s.img= cv2.imread(s.path)
+        h,w,_ = s.img.shape
+        if h<w:
+            s.img = np.rot90(s.img)
+        s.img = cv2.resize(s.img,(320,480))
+
+        s.orient = 0
+        
+        b,g,r = cv2.split(s.img)
+        b = np.bitwise_and(b,0xF8)
+        g = np.bitwise_and(g,0xFC)
+        r = np.bitwise_and(r,0xF8)
+        s.orig = cv2.merge([b,g,r])  #original image (no changes)
+        s.img = s.orig.copy() #image no processing but rotated
+        s.shimg = s.orig.copy() #image to show
+        s.sat = 0
+        s.bright = 0
+
+    def rotate(s):
+        if s.orient == 0:
+            s.img = imutils.rotate(s.orig, 90)
+            s.img = cv2.resize(s.img,(320,480))
+            
+        elif s.orient == 1:
+            s.img = np.rot90(s.orig,2)
+
+        elif s.orient == 2:
+            s.img = imutils.rotate(s.orig, 270)
+            s.img = cv2.resize(s.img,(320,480))
+        elif s.orient == 3:
+            s.img = s.orig
+            s.orient = -1
+
+        s.orient += 1
+        print(s.orient)
+        s.procIMG()
+
+
+    def getIMG(s):
+        s.procIMG()
+        return s.shimg
+
+    def procIMG(s):
+        im = s.img
+        hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+        h,ss,v = cv2.split(hsv)
+        
+        #Saturating
+        ss = ss.astype(np.int32)
+        ss += s.sat
+        np.clip(ss,0,255,ss)
+        ss = ss.astype(np.uint8)
+
+        #brightness
+   #     v = v.astype(np.int32)
+   #     v += self.brs[index]
+   #     np.clip(v,0,255,v)
+   #     v = v.astype(np.uint8)
+        
+        hsv = cv2.merge([h,ss,v])
+        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        b,g,r = cv2.split(img)
+        b = b.astype(np.int32)
+        g = g.astype(np.int32)
+        r = r.astype(np.int32)
+
+        b += s.bright
+        g += s.bright
+        r += s.bright
+
+        np.clip(b,0,255,b)
+        np.clip(g,0,255,g)
+        np.clip(r,0,255,r)
+
+        b = b.astype(np.uint8)
+        g = g.astype(np.uint8)
+        r = r.astype(np.uint8)
+
+        s.shimg = cv2.merge([b,g,r])
+###################################################
+
+
 class app:
     
     def __init__(self):
         #constants
         self.imgs = []
-        self.sats = []
-        self.brs = []
 
         self.imgcnt = 0
         self.window = Tk()
         self.window.title("AdCharger uploader")
-        self.window.geometry('600x600')
+        self.window.resizable(width=False, height=False)
+
+        #self.window.geometry('600x600')
+        self.window.grid_propagate(1)
         self.gr = np.ones((480,320,3),np.uint8)*127  
         self.grTk = self.cv2totk(self.gr)
         self.drawWidgets()
@@ -83,27 +176,9 @@ class app:
         im = Image.fromarray(img)
         return ImageTk.PhotoImage(image=im)
 
-    def cvtimg(self,path):
-        self.img = cv2.imread(path)
-        b,g,r = cv2.split(self.img)
-        b = np.bitwise_and(b,0xF8)
-        g = np.bitwise_and(g,0xFC)
-        r = np.bitwise_and(r,0xF8)
-        self.img = cv2.merge([b,g,r])
-
-        h,w,_ = self.img.shape
-        print(h,w)
-        if h<w:
-            self.img = np.rot90(self.img)
-        self.ish = cv2.resize(self.img,(320,480))
-        return self.ish
-
     def roti(self):
-        try:
-            self.imgs[self.indImg] = np.rot90(self.imgs[self.indImg],k=2)
-            self.loadimgp(self.indImg)
-        except:
-            pass
+        self.imgs[self.indImg].rotate()
+        self.refreshimg(self.indImg)
 
     def selectport(self,evt):
         w = evt.widget
@@ -114,61 +189,26 @@ class app:
         print(self.dev)
 
     def loadimg(self):
-        file = filedialog.askopenfilename()
-        self.status.set("Status: Archivo %s cargado" % file)
-        self.imgs.append(self.cvtimg(file))
-        self.brs.append(0)
-        self.sats.append(0)
-        self.listbox.insert(END,file)
-        self.indImg = len(self.imgs)-1
-        ##self.listbox.focus(self.indImg)
-        self.loadimgp()
+        f = filedialog.askopenfilenames(title="Elige las imagenes a cargar" ,filetypes=[("Archivos de imagen", ".jpg .png .jpeg"),("Cualquier tipo","*")])
+        f = list(f)
+        for file in f:
+            self.status.set("Status: Archivo %s cargado" % file)
+            self.imgs.append(IMG(file))
+            self.listbox.insert(END,file)
+            self.indImg = len(self.imgs)-1
+            self.listbox.selection_set(self.indImg)
+            self.refreshimg()
 
-    def loadimgp(self,index=-1):
+    def refreshimg(self,index=-1):
         if index<0:
             index = self.indImg
-
-        im = self.imgs[index].copy()
-        hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-        h,s,v = cv2.split(hsv)
-        
-        #Saturating
-        s = s.astype(np.int32)
-        s += self.sats[index]
-        np.clip(s,0,255,s)
-        s = s.astype(np.uint8)
-
-        #brightness
-   #     v = v.astype(np.int32)
-   #     v += self.brs[index]
-   #     np.clip(v,0,255,v)
-   #     v = v.astype(np.uint8)
-        
-        hsv = cv2.merge([h,s,v])
-        img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-        b,g,r = cv2.split(img)
-        b = b.astype(np.int32)
-        g = g.astype(np.int32)
-        r = r.astype(np.int32)
-
-        b += self.brs[index]
-        g += self.brs[index]
-        r += self.brs[index]
-
-        np.clip(b,0,255,b)
-        np.clip(g,0,255,g)
-        np.clip(r,0,255,r)
-
-        b = b.astype(np.uint8)
-        g = g.astype(np.uint8)
-        r = r.astype(np.uint8)
-
-        img = cv2.merge([b,g,r])
-
-
-        self.img = self.cv2totk(img)  
-        self.canvas.create_image(20, 20, anchor=NW, image=self.img) 
+        img = self.imgs[index].getIMG()
+        #cv2.imshow("a",img)
+        #cv2.waitKey(0)
+        #print(img.shape)
+        self.tkimg = self.cv2totk(img)
+        self.canvas.create_image(0, 0, anchor=NW, image=self.tkimg) 
+        #self.canvas.itemconfig(self.canvas,image = tkimg)
 
     def upload(self):
         self.trans()
@@ -176,30 +216,57 @@ class app:
     def deli(self):
         self.listbox.delete(self.indImg)
         self.imgs.pop(self.indImg)
-        self.sats.pop(self.indImg)
-        self.brs.pop(self.indImg)
         
         if len(self.imgs==0):
             self.indImg=-1
             self.setgrayimg()
         else:
             self.indImg=0
-            self.loadimgp(0)
+            self.refreshimg(0)
 
     def onselect(self,evt):
         w = evt.widget
         self.indImg = int(w.curselection()[0])
         value = w.get(self.indImg)
-        self.loadimgp(self.indImg)
+        self.refreshimg(self.indImg)
+        self.br.set(self.imgs[self.indImg].bright)
+        self.sat.set(self.imgs[self.indImg].sat)
         #print ('You selected item %d: "%s"' % (index, value))
 
     def updbright(self,evt):
-        self.brs[self.indImg] = self.br.get()
-        self.loadimgp(self.indImg)
+        self.imgs[self.indImg].bright = self.br.get()
+        self.refreshimg(self.indImg)
         
     def updsat(self,evt):
-        self.sats[self.indImg] = self.sat.get()
-        self.loadimgp(self.indImg)
+        self.imgs[self.indImg].sat = self.sat.get()
+        self.refreshimg(self.indImg)
+
+    def upsel(self):
+        if self.indImg==0:
+            return
+        else:
+            nwind = self.indImg-1
+            self.imgs.insert(nwind, self.imgs.pop(self.indImg))
+            path = self.listbox.get(self.indImg)
+            self.listbox.delete(self.indImg)
+            self.listbox.insert(nwind,path)
+            self.indImg-=1
+            self.listbox.selection_set(self.indImg)
+            self.refreshimg()
+
+
+    def dwsel(self):
+        if self.indImg==len(self.imgs)-1:
+            return
+        else:
+            nwind = self.indImg+1
+            self.imgs.insert(nwind, self.imgs.pop(self.indImg))
+            path = self.listbox.get(self.indImg)
+            self.listbox.delete(self.indImg)
+            self.listbox.insert(nwind,path)
+            self.indImg+=1
+            self.listbox.selection_set(self.indImg)
+            self.refreshimg()
 
 
     def updports(self):
@@ -214,67 +281,79 @@ class app:
             self.setDev(prts[0])
             self.status.set("Puerto %s seleccionado" % prts[0])
             self.setBaud()
-            self.connect()
+            #self.connect()
 
     def drawWidgets(self):
+        ######################
+        #Separators
+
+
         ###################
         #first row
-        lbl = Label(self.window, text="Vista previa")
-        lbl.grid(column=0, row=0)
+        Label(self.window, text="Vista previa").grid(column=0, row=0)
         
-        tkinter.ttk.Separator(self.window, orient=VERTICAL).grid(column=1, row=0, rowspan=2, sticky='ns')
+        #tkinter.ttk.Separator(self.window, orient=VERTICAL).grid(column=1, row=0, rowspan=5, sticky='ns')
         
-        lbl2 = Label(self.window, text="Lista de imagenes")
-        lbl2.grid(column=2, row=0)
+        Label(self.window, text="Lista de imagenes").grid(column=2, row=0)
+        Label(self.window, text="Ajuste de imagen").grid(column=4, row=0)
         
         ####################
         #Second
         self.canvas = Canvas(self.window, width = 320, height = 480)      
-        self.canvas.grid(column=0,row=1,rowspan=3)
+        self.canvas.grid(column=0,row=1,rowspan=4)
         self.setgrayimg()
+
         self.listbox = Listbox(self.window,name='lb')
-        self.listbox.grid(column=2,row=1,sticky=W+E)
+        self.listbox.grid(column=2,row=1,columnspan=2,sticky=W+E)
         self.listbox.bind('<<ListboxSelect>>', self.onselect)
-        lbl3 = Label(self.window, text= "Puertos:")
-        lbl3.grid(column=2,row=2)
+
+        btnup = Button(self.window, text="Subir", command=self.upsel)
+        btnup.grid(column=2,row=2)
+        btndw = Button(self.window, text="Bajar", command=self.dwsel)
+        btndw.grid(column=3,row=2)
+
+        
+        Label(self.window, text= "Puertos:").grid(column=2,row=3)
+
         self.ports = Listbox(self.window,name='ports')
-        self.ports.grid(column=2,row=2,sticky=W+E)
+        self.ports.grid(column=2,columnspan=2,row=4,sticky=W+E)
         self.ports.bind('<<ListboxSelect>>', self.selectport)
+
+        self.br = Scale(self.window, from_=-255, to=255,command=self.updbright)
+        self.br.set(0)
+        self.br.grid(column=4,rowspan=1,row=1,sticky=N+S)
+
+        self.sat = Scale(self.window, from_=-255, to=255,command=self.updsat)
+        self.sat.set(0)
+
+        self.sat.grid(column=4,row=4,sticky=N+S)
+
+        Label(self.window, text="Brillo").grid(column=4, row=2)
+        Label(self.window, text="Saturacion").grid(column=4, row=5)
 
 
         ####################
         #Third row  	
         btn = Button(self.window, text="Agregar...", command=self.loadimg)
-        btn.grid(column=0,row=4)
+        btn.grid(column=0,row=5)
         btn1 = Button(self.window, text="Quitar", command=self.deli)
-        btn1.grid(column=0,row=5)
+        btn1.grid(column=0,row=6)
         btn3 = Button(self.window, text="Rotar", command=self.roti)
-        btn3.grid(column=2,row=4)
-        btn2 = Button(self.window, text="Subir!", command=self.upload)
-        btn2.grid(column=2,row=5)
+        btn3.grid(column=2,columnspan=2,row=5)
+        btn2 = Button(self.window, text="Cargar!", command=self.upload)
+        btn2.grid(column=4,row=6)
         
         btn4 = Button(self.window, text="Actualizar puertos", command=self.updports)
-        btn4.grid(column=2,row=6)
-
-
-        
-
-        self.br = Scale(self.window, from_=-255, to=255,label="Brillo",command=self.updbright)
-        self.br.set(0)
-        self.sat = Scale(self.window, from_=-255, to=255,label="Saturacion",command=self.updsat)
-        self.sat.set(0)
-
-        self.br.grid(column=3,rowspan=2,row=0,sticky=N+S)
-        self.sat.grid(column=3,rowspan=2,row=2,sticky=N+S)
+        btn4.grid(column=2,columnspan=2,row=6)
 
         self.status = StringVar(value="Status: Bienvenido!")
 
         statusbar = Label(self.window, textvariable=self.status, bd=1, relief=SUNKEN, anchor=W)
-        statusbar.grid(column=0,columnspan=4,row=9, sticky=W+E)
+        statusbar.grid(column=0,columnspan=5,row=8, sticky=W+E)
 
 
         self.bar = Progressbar(self.window, length=200)
-        self.bar.grid(column=0,columnspan=4,row=10,sticky=W+E)
+        self.bar.grid(column=0,columnspan=5,row=9,sticky=W+E)
         
         self.updports()
 
@@ -312,17 +391,17 @@ class app:
             self.status.set("Subiendo imagen %d de %d" % (i+1,len(self.imgs)))
             ou = ""
            
-            sval  = self.sats[i]
-            vval  = self.brs[i]
+            #sval  = im.sat
+            #vval  = im.bright
 
-            hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-            h,s,v = cv2.split(hsv)
+            #hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+            #h,s,v = cv2.split(hsv)
 
             #Saturating 
-            s = s.astype(np.int)
-            s += sval
-            np.clip(s,0,255,s)
-            s = s.astype(np.uint8)
+            #s = s.astype(np.int)
+            #s += sval
+            #np.clip(s,0,255,s)
+            #s = s.astype(np.uint8)
             
             ##reducing brightness
             #v = v.astype(np.int)
@@ -330,33 +409,35 @@ class app:
             #np.clip(v,0,255,v)
             #v = v.astype(np.uint8)
 
-            hsv = cv2.merge([h,s,v])
+            #hsv = cv2.merge([h,s,v])
 
-            img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+            #img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
             
-            b,g,r = cv2.split(img)
-            b = b.astype(np.int32)
-            g = g.astype(np.int32)
-            r = r.astype(np.int32)
+            #b,g,r = cv2.split(img)
+            #b = b.astype(np.int32)
+            #g = g.astype(np.int32)
+            #r = r.astype(np.int32)
     
-            b += self.brs[i]
-            g += self.brs[i]
-            r += self.brs[i]
+            #b += self.brs[i]
+            #g += self.brs[i]
+            #r += self.brs[i]
     
-            np.clip(b,0,255,b)
-            np.clip(g,0,255,g)
-            np.clip(r,0,255,r)
+            #np.clip(b,0,255,b)
+            #np.clip(g,0,255,g)
+            #np.clip(r,0,255,r)
     
-            b = b.astype(np.uint8)
-            g = g.astype(np.uint8)
-            r = r.astype(np.uint8)
+            #b = b.astype(np.uint8)
+            #g = g.astype(np.uint8)
+            #r = r.astype(np.uint8)
     
-            img = cv2.merge([b,g,r])
+            #img = cv2.merge([b,g,r])
 
             
             #img2 = cv2.resize(img,(self.width,self.height))
-            img2 = np.rot90(img,k=1)
-            img2 = np.flip(img2,axis=0)
+            #img2 = np.rot90(img,k=1)
+            #img2 = np.flip(img2,axis=0)
+
+            img2 = im.shimg.copy()
             
             b,g,r = cv2.split(img2)
             

@@ -1,9 +1,15 @@
-rm AdChargerUploader -r
+rd /S /Q output 
+rd /S /Q input
+mkdir input
+
 copy ..\app.py input\
-python C:\Users\Tonny\Documents\VBshare\RPi_display_with_bluepill\exe\Intensio-Obfuscator\intensio\intensio_obfuscator.py --input input --output AdChargerUploader -rth
-copy AdChargerUploader.py AdChargerUploader\
-cd AdChargerUploader
-pyinstaller AdChargerUploader.py app.py --windowed
-rm AdChargerUploader.py app.py
+python Intensio-Obfuscator\intensio\intensio_obfuscator.py --input input --output output -rth
+
+copy AdChargerUploader.py output\
+cd output
+
+pyinstaller AdChargerUploader.py app.py
+del AdChargerUploader.py app.py
 cd..
-C:\Users\Tonny\Documents\VBshare\RPi_display_with_bluepill\exe\AdChargerUploader\dist\AdChargerUploader\AdChargerUploader.exe
+
+output\dist\AdChargerUploader\AdChargerUploader.exe

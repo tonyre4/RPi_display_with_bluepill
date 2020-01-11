@@ -34,6 +34,7 @@ char incom;
 uint16_t data=0;
 uint16_t inci[5];
 uint16_t times[] = {1,10,100,1000,10000};
+uint32_t delays[] = {1000,3000,5000,7000,10000,13000,15000};
 String filename = "ima0.txt";
 uint8_t fcntr = 0;
 bool progmode = false;
@@ -41,6 +42,7 @@ bool getfpointer = false;
 bool filing = false;
 uint8_t fpointer;
 bool exitt=false;
+bool delaymode = false;
 
 //###########END VARS ###############
 
@@ -134,22 +136,29 @@ bool dec2(char c){
 
     case 'z':
       myFile.print(c);
-      myFile.close();
+      delaymode = true;
+      //myFile.close();
       break;
       
     case '0' ... '?':
+        if (delaymode){
+          myFile.print(c);
+          delaymode=false;
+          myFile.close();
+          break;
+        }
     case ',':
     case '\n':
     case '&':
-        if (getfpointer){
-          myFile.close();
-          fpointer = c - '0';
-          loadfile();
-        }
-        if(filing){
-          myFile.print(c);
-          dec(c);
-        }
+          if (getfpointer){
+            myFile.close();
+            fpointer = c - '0';
+            loadfile();
+          }
+          if(filing){
+            myFile.print(c);
+            dec(c);
+          }
       break;
 
     case '!':
@@ -159,7 +168,7 @@ bool dec2(char c){
         tft.setTextSize(2);
         tft.println("Uploading done!");
       exitt = true;
-      delay(2000);
+      delay(5000);
       return true;
   }
   return false;
@@ -213,12 +222,19 @@ void dec(char c){
       y++;
       break;
     case 'z':
-      delay(5000);
+      delaymode=true;
+      //delay(5000);
       break;
     case '0' ... '?':
-      uint16_t cc = c;
-      data |= (cc-'0'<<idx*4);
-      idx++;
+      if (delaymode){
+        delay(delays[c-'0']);
+        delaymode = false; 
+      }
+      else{
+        uint16_t cc = c;
+        data |= (cc-'0'<<idx*4);
+        idx++;
+      }
       break;
     
       }

@@ -464,7 +464,7 @@ class app:
             #img2 = np.flip(img2,axis=0)
 
             img2 = im.shimg.copy()
-            img2 = np.rot90(img2,3)
+            img2 = np.rot90(img2)
             
             b,g,r = cv2.split(img2)
             

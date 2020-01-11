@@ -528,7 +528,8 @@ class app:
             #    f.write(ou)
             #    f.write("z")
             
-            self.ser.write('p{}.'.format(self.fcntr).encode())
+            #self.ser.write('p{}.'.format(self.fcntr).encode())
+            self.ser.write('p.'.format(self.fcntr).encode())
             #with open("./decimgs/ima{}.txt".format(fcntr), "r") as f:
             #    for l in f:
             #        for c in l:

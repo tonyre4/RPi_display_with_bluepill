@@ -11,7 +11,9 @@ import numpy as np
 import sys
 import glob
 
-        
+
+timestr = ["1","3","5","7","10","13","15"]
+times = [1000,3000,5000,7000,10000,13000,15000]
 
 def serial_ports():
     """ Lists serial port names
@@ -52,6 +54,7 @@ def serial_ports():
 class IMG:
     def __init__(s,path):
         s.path = path
+        s.time = 2 #index
         s.imread()
 
     def imread(s):
@@ -187,6 +190,7 @@ class app:
         self.dev = value
         self.status.set("Status: Puerto %s seleccionado" % value)
         print(self.dev)
+        self.connect()
 
     def loadimg(self):
         f = filedialog.askopenfilenames(title="Elige las imagenes a cargar" ,filetypes=[("Archivos de imagen", ".jpg .png .jpeg"),("Cualquier tipo","*")])
@@ -197,6 +201,7 @@ class app:
             self.listbox.insert(END,file)
             self.indImg = len(self.imgs)-1
             self.listbox.selection_set(self.indImg)
+            self.combo.current(2)
             self.refreshimg()
 
     def refreshimg(self,index=-1):
@@ -231,6 +236,7 @@ class app:
         self.refreshimg(self.indImg)
         self.br.set(self.imgs[self.indImg].bright)
         self.sat.set(self.imgs[self.indImg].sat)
+        self.combo.current(self.imgs[self.indImg].time)
         #print ('You selected item %d: "%s"' % (index, value))
 
     def updbright(self,evt):
@@ -283,6 +289,11 @@ class app:
             self.setBaud()
             #self.connect()
 
+    def updtime(self,evt):
+        if self.indImg>=0:
+            self.imgs[self.indImg].time = self.combo.current()
+            print(times[self.imgs[self.indImg].time])
+
     def drawWidgets(self):
         ######################
         #Separators
@@ -314,6 +325,13 @@ class app:
 
         
         Label(self.window, text= "Puertos:").grid(column=2,row=3)
+        Label(self.window, text= "Tiempo (s):").grid(column=3,row=3)
+
+        self.combo = ttk.Combobox(self.window,width=10)
+        self.combo["values"] = timestr
+        self.combo.current(2)
+        self.combo.bind('<<ComboboxSelected>>', self.updtime)
+        self.combo.grid(column=4,row=3)
 
         self.ports = Listbox(self.window,name='ports')
         self.ports.grid(column=2,columnspan=2,row=4,sticky=W+E)
@@ -364,6 +382,14 @@ class app:
     ######################
 
     def connect(self):
+        try:
+            if self.ser:
+                self.ser.close()
+            self.stablish()
+        except:
+            self.stablish()
+
+    def stablish(self):
         self.ser = serial.Serial(self.dev,self.baud)
         self.status.set("Conectando con dispositivo...")
         if not self.ser.isOpen():
@@ -438,6 +464,7 @@ class app:
             #img2 = np.flip(img2,axis=0)
 
             img2 = im.shimg.copy()
+            img2 = np.rot90(img2,3)
             
             b,g,r = cv2.split(img2)
             
@@ -495,6 +522,7 @@ class app:
                 #f.write("\n")
 
             ou+="z"
+            ou+=str(im.time)
         
             #with open("./decimgs/ima{}.txt".format(fcntr), "w+") as f:
             #    f.write(ou)

@@ -61,7 +61,7 @@ class IMG:
         s.img= cv2.imread(s.path)
         h,w,_ = s.img.shape
         if h<w:
-            s.img = np.rot90(s.img)
+            s.img = np.rot90(s.img,3)
         s.img = cv2.resize(s.img,(320,480))
 
         s.orient = 0
@@ -146,6 +146,9 @@ class app:
     def __init__(self):
         #constants
         self.imgs = []
+
+        #Boolean state for connected device
+        self.connected = False
 
         self.imgcnt = 0
         self.window = Tk()
@@ -294,6 +297,7 @@ class app:
             self.imgs[self.indImg].time = self.combo.current()
             print(times[self.imgs[self.indImg].time])
 
+
     def drawWidgets(self):
         ######################
         #Separators
@@ -311,7 +315,7 @@ class app:
         ####################
         #Second
         self.canvas = Canvas(self.window, width = 320, height = 480)      
-        self.canvas.grid(column=0,row=1,rowspan=4)
+        self.canvas.grid(column=0,row=1,rowspan=5)
         self.setgrayimg()
 
         self.listbox = Listbox(self.window,name='lb')
@@ -344,34 +348,36 @@ class app:
         self.sat = Scale(self.window, from_=-255, to=255,command=self.updsat)
         self.sat.set(0)
 
-        self.sat.grid(column=4,row=4,sticky=N+S)
+        self.sat.grid(column=4,row=4,sticky=N+S,rowspan=2)
 
         Label(self.window, text="Brillo").grid(column=4, row=2)
-        Label(self.window, text="Saturacion").grid(column=4, row=5)
+        Label(self.window, text="Saturacion").grid(column=4, row=6)
 
+        btnconn = Button(self.window, text="Conectar", command=self.conn)
+        btnconn.grid(column=2,row=5,columnspan=2)
 
         ####################
         #Third row  	
         btn = Button(self.window, text="Agregar...", command=self.loadimg)
-        btn.grid(column=0,row=5)
+        btn.grid(column=0,row=6)
         btn1 = Button(self.window, text="Quitar", command=self.deli)
-        btn1.grid(column=0,row=6)
+        btn1.grid(column=0,row=7)
         btn3 = Button(self.window, text="Rotar", command=self.roti)
-        btn3.grid(column=2,columnspan=2,row=5)
+        btn3.grid(column=2,columnspan=2,row=6)
         btn2 = Button(self.window, text="Cargar!", command=self.upload)
-        btn2.grid(column=4,row=6)
+        btn2.grid(column=4,row=7)
         
         btn4 = Button(self.window, text="Actualizar puertos", command=self.updports)
-        btn4.grid(column=2,columnspan=2,row=6)
+        btn4.grid(column=2,columnspan=2,row=7)
 
         self.status = StringVar(value="Status: Bienvenido!")
 
         statusbar = Label(self.window, textvariable=self.status, bd=1, relief=SUNKEN, anchor=W)
-        statusbar.grid(column=0,columnspan=5,row=8, sticky=W+E)
+        statusbar.grid(column=0,columnspan=5,row=9, sticky=W+E)
 
 
         self.bar = Progressbar(self.window, length=200)
-        self.bar.grid(column=0,columnspan=5,row=9,sticky=W+E)
+        self.bar.grid(column=0,columnspan=5,row=10,sticky=W+E)
         
         self.updports()
 
@@ -380,6 +386,16 @@ class app:
     ######################
     ##Transmission classes
     ######################
+
+    def conn(self):
+        self.connect()
+        self.ser.write('r'.encode())
+        z = self.ser.read()
+        if z=='r':
+            self.status.set("Conexion con dispositivo realizada")
+        else:
+            self.status.set("Error: El dispositivo no se ha conectado. Probar con otro puerto")
+
 
     def connect(self):
         try:
@@ -395,7 +411,8 @@ class app:
         if not self.ser.isOpen():
             self.ser.open()
             print('com3 is open', self.ser.isOpen())
-        self.ser.write('&&&&&&&&&&&&&'.encode())
+        if sys.platform.startswith('win'):
+            self.ser.write('&&&&&&&&&&&&&'.encode())
 
     def setDev(self,st):
         #if st.find("COM")>-1:
@@ -417,54 +434,10 @@ class app:
             self.status.set("Subiendo imagen %d de %d" % (i+1,len(self.imgs)))
             ou = ""
            
-            #sval  = im.sat
-            #vval  = im.bright
-
-            #hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-            #h,s,v = cv2.split(hsv)
-
-            #Saturating 
-            #s = s.astype(np.int)
-            #s += sval
-            #np.clip(s,0,255,s)
-            #s = s.astype(np.uint8)
-            
-            ##reducing brightness
-            #v = v.astype(np.int)
-            #v += vval
-            #np.clip(v,0,255,v)
-            #v = v.astype(np.uint8)
-
-            #hsv = cv2.merge([h,s,v])
-
-            #img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-            
-            #b,g,r = cv2.split(img)
-            #b = b.astype(np.int32)
-            #g = g.astype(np.int32)
-            #r = r.astype(np.int32)
-    
-            #b += self.brs[i]
-            #g += self.brs[i]
-            #r += self.brs[i]
-    
-            #np.clip(b,0,255,b)
-            #np.clip(g,0,255,g)
-            #np.clip(r,0,255,r)
-    
-            #b = b.astype(np.uint8)
-            #g = g.astype(np.uint8)
-            #r = r.astype(np.uint8)
-    
-            #img = cv2.merge([b,g,r])
-
-            
-            #img2 = cv2.resize(img,(self.width,self.height))
-            #img2 = np.rot90(img,k=1)
-            #img2 = np.flip(img2,axis=0)
 
             img2 = im.shimg.copy()
             img2 = np.rot90(img2)
+            img2 = np.flip(img2,axis=0)
             
             b,g,r = cv2.split(img2)
             
@@ -529,10 +502,10 @@ class app:
             #    f.write("z")
             
             #self.ser.write('p{}.'.format(self.fcntr).encode())
-            self.ser.write('p.'.format(self.fcntr).encode())
-            #with open("./decimgs/ima{}.txt".format(fcntr), "r") as f:
-            #    for l in f:
-            #        for c in l:
+            self.ser.write('.'.format(self.fcntr).encode())
+            #with open("./decimgs/ima{}.txt".format(i), "w") as f:
+            #        for c in ou:
+            #            f.write(c)
             for ii,c in enumerate(ou):
                 self.ser.write('{}'.format(c).encode())
                 if ii%100==0:
@@ -540,7 +513,7 @@ class app:
                     self.window.update_idletasks()
             self.fcntr +=1
             
-        self.ser.write('!'.format().encode())
+        self.ser.write('.!'.format().encode())
         self.ser.close()
 
         self.bar['value'] = 100

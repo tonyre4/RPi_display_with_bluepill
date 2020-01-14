@@ -35,12 +35,12 @@ uint16_t data=0;
 uint16_t inci[5];
 uint16_t times[] = {1,10,100,1000,10000};
 uint32_t delays[] = {1000,3000,5000,7000,10000,13000,15000};
-String filename = "ima0.txt";
+String filename = "ima00.txt";
 uint8_t fcntr = 0;
 bool progmode = false;
 bool getfpointer = false;
 bool filing = false;
-uint8_t fpointer;
+uint8_t fpointer,fpointerdec,fpointeruni;
 bool exitt=false;
 bool delaymode = false;
 
@@ -51,43 +51,33 @@ bool delaymode = false;
 //#define TESTGFX
 //#define TESTSERIAL
 
+void SDinit();
+bool pgmMode();
+
 #if defined(TESTGFX) || defined(TESTSD) || defined(TESTSERIAL)
 #else
-void setup() {
-  
 
-  //Serial.begin(115200);
-  Serial.begin(500000);
-  
-  SPI.setModule(2);
-  tft.begin(0x9486);
-  tft.setRotation(2);
-  tft.fillScreen(BLACK);
-  pinMode(PC13,OUTPUT);
-
-  SDinit();
-
-  if (pgmMode())
-    PCtransf();
-  
-}
-
-
-void loop() {
-    dec(readSDchar());
+char waitResponse(){
+  while(1){
+    if (Serial.available()>0){
+      return Serial.read();
+      }
+    }
 }
 
 void PCtransf(){
-  tftmgs("Entering to \nprogramming mode");
-  delay(5000);
+  tftmsg("Entering to \nprogramming mode");
+  delay(2000);
+  tftmsg("Please press 'Conectar' button");
+  while(waitResponse() != 'r');
   Serial.write('r');
-  tftmgs("Ready");
+  tftmsg("Device connected to software,\nmanage your images and then press 'Cargar!' button");
   
   while(1){
     if (Serial.available()>0){
       char c = Serial.read();
-      //tftmgs(c);
-      Serial.write(c);
+      //tftmsg(c);
+      //Serial.write(c);
       dec2(c);
       if (exitt){
         break;
@@ -96,42 +86,65 @@ void PCtransf(){
   }
 }
 
-void tftmgs(char *s){
-  tft.fillScreen(BLACK);
+void tftmsg(char *s, uint16_t background, uint16_t fcolor){
+  tft.fillScreen(background);
   tft.setCursor(0, 0);
-  tft.setTextColor(GREEN);
-  tft.setTextSize(2);
-  tft.println(s);
-}
-void tftmgs(char s){
-  tft.fillScreen(GREEN);
-  tft.setCursor(0, 0);
-  tft.setTextColor(RED);
+  tft.setTextColor(fcolor);
   tft.setTextSize(2);
   tft.println(s);
 }
 
+void tftmsg(char *s){
+  tftmsg(s,BLACK,RED);
+}
+
+void openNext(){
+  fnmaker();
+  myFile.close();
+  myFile = SD.open(filename);
+  fpointer++;
+}
+void loadfile(){
+  fnmaker();
+  myFile.close();
+  myFile = SD.open(filename,FILE_WRITE);
+  fpointer++;
+}
+
+void fnmaker(){
+  fpointeruni = fpointer%10;
+  fpointerdec = fpointer/10;
+  filename[3] = '0' + fpointerdec;
+  filename[4] = '0' + fpointeruni;
+}
 
 
 bool dec2(char c){
   switch (c){
     case 'd':
-      myFile.close();
-      for(int i=0;i<10;i++){ //Deleting images
+      tftmsg("Deleting existing images...");
+      for(int i=0;i<100;i++){ //Deleting images
           fpointer = i;
-          filename[3] = '0' + fpointer;
-          SD.remove(filename.c_str()); 
+          fnmaker();
+          if (SD.exists(filename))
+            SD.remove(filename.c_str()); 
       }
+      tftmsg("Images deleted succesfully!");
+      fpointer = 0;
       break;
-    case 'p':
-      getfpointer = true;
-      break;
+      
+      
+    //case 'p':
+    //  getfpointer = true;
+    //  break;
 
     case '.':
-      if(getfpointer){
-        getfpointer = false;
-        filing = true;
-      }
+//      if(getfpointer){
+//        getfpointer = false;
+//        filing = true;
+//      }
+      //openNext();
+      loadfile();
     break;
 
     case 'z':
@@ -144,43 +157,31 @@ bool dec2(char c){
         if (delaymode){
           myFile.print(c);
           delaymode=false;
-          myFile.close();
           break;
         }
     case ',':
     case '\n':
     case '&':
-          if (getfpointer){
-            myFile.close();
-            fpointer = c - '0';
-            loadfile();
-          }
-          if(filing){
-            myFile.print(c);
-            dec(c);
-          }
+      myFile.print(c);
+      dec(c);
       break;
 
     case '!':
-        tft.fillScreen(BLACK);
-        tft.setCursor(0, 0);
-        tft.setTextColor(GREEN);  
-        tft.setTextSize(2);
-        tft.println("Uploading done!");
+      tftmsg("Uploading done!", GREEN, BLACK);
       exitt = true;
+      fpointer = 0;
+      myFile.print(c);
+      myFile.close();
       delay(5000);
       return true;
   }
   return false;
 }
 
-void loadfile(){
-  filename[3] = '0' + fpointer;
-  myFile = SD.open(filename,FILE_WRITE);
-}
+
 
 bool pgmMode(){
-  for(int i=0;i<3000;i++){
+  for(int i=0;i<7000;i++){
     if (Serial.available()>0){
       return true;
     }
@@ -192,7 +193,7 @@ bool pgmMode(){
         tft.setTextSize(2);
         tft.println("Loading... ");
         int ii = i/1000;
-        tft.print(3-ii);
+        tft.print(7-ii);
         tft.print("s left");
         Serial.print("Hello");
       }
@@ -236,50 +237,76 @@ void dec(char c){
         idx++;
       }
       break;
-    
+      case '!':
+        fpointer=0;
+      break;
       }
+
 }
 
 void SDinit(){
   //Serial.print("Initializing SD card...");
   if (!SD.begin(SS_SD)) {
-    tft.fillScreen(BLACK);
-    tft.setCursor(0, 0);
-    tft.setTextColor(RED);  tft.setTextSize(2);
-    tft.println("SD card not found!");
+    tftmsg("SD card not found!\nPlease contact to support:\nRedTam SA CV\n8341006372", BLACK,RED);
     while (1);
   }
-  readtxtinit();
+  ///readtxtinit();
 }
 
-boolean readtxtinit(){
-  myFile = SD.open(filename);
-  fcntr = (fcntr==10) ? 0 : fcntr+1;
-  filename[3] = '0' + fcntr;
-  if (myFile){
-    return true;
-  }
-  else{
-    return false;
-  }
-}
+//boolean readtxtinit(){
+//
+//  openNext();
+//  
+//  if (myFile){
+//    return true;
+//  }
+//  else{
+//    return false;
+//  }
+//}
 
 char readSDchar(){
   if (myFile.available()){
     return myFile.read();
   }
   else{
-    myFile.close();
-    while( !readtxtinit() ){
-      ;
-    }
+    //myFile.close();
+    openNext();
+//    while( !readtxtinit() ){
+//      ;
+//    }
     //return 'z';
     return myFile.read();
   }
 }
 
-#endif
+void setup() {
+  
 
+  //Serial.begin(115200);
+  Serial.begin(500000);
+  
+  SPI.setModule(2);
+  tft.begin(0x9486);
+  tft.setRotation(2);
+  tft.fillScreen(BLACK);
+  pinMode(PC13,OUTPUT);
+
+  SDinit();
+
+  if (pgmMode())
+    PCtransf();
+  
+}
+
+void loop() {
+    dec(readSDchar());
+}
+
+#endif
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
 
 #ifdef TESTGFX
 void setup() {
